@@ -26,7 +26,7 @@ Official repository for **"A Dual-Branch Wavelet-ResNet Model with Cross-Attenti
 
 <sup>*</sup> Equal contribution (co-first authors)  
 <sup>✉</sup> Corresponding author: [dikaplun@etu.ru](mailto:dikaplun@etu.ru)  
-**Conference Website:** [biomedicalimaging.org](https://biomedicalimaging.org/) | **Code:** [github.com/mukutchatterjee/dual-branch-wavelet-resnet](https://github.com/mukutchatterjee/dual-branch-wavelet-resnet)
+**Conference Website:** [biomedicalimaging.org](https://biomedicalimaging.org/)
 
 ---
 
