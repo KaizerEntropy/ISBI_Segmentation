@@ -84,7 +84,7 @@ The framework was evaluated across three public histopathology benchmarks: **MoN
 | Swin-UNet (2022) | Hierarchical Vision Transformer | 80.12 / 53.12 / 54.87 | 84.71 / 61.46 / 63.12 | 86.92 / 65.79 / 61.28 |
 | DELTASEG (2023) | Differential Boundary Network | 81.42 / -- / -- | 82.95 / -- / -- | -- / -- / -- |
 | Trans-UNet (2021) | Hybrid CNN-Transformer | 81.01 / 57.31 / 56.88 | 86.78 / 63.15 / 65.16 | 88.45 / 68.78 / 63.17 |
-| U$^2$-Net (2020) | Nested U-Structure | 80.92 / 56.72 / 56.02 | 85.92 / 62.01 / 62.58 | 87.78 / 67.34 / 62.39 |
+| U<sup>2</sup>-Net (2020) | Nested U-Structure | 80.92 / 56.72 / 56.02 | 85.92 / 62.01 / 62.58 | 87.78 / 67.34 / 62.39 |
 | **DualBranchNet (Ours)** | **Wavelet-ResNet Fuzzy Hybrid** | **82.46 / 62.44 / 61.49** | **88.00 / 70.23 / 69.69** | **90.02 / 70.82 / 67.40** |
 
 </details>
@@ -236,11 +236,11 @@ $$c_l = x_{00} + k_h \mathcal{U}_h(d_h) + k_v \mathcal{U}_v(d_v) + k_d \mathcal{
 
 The complete sub-band representation is projected via a $1\times1$ convolution:
 
-$$\mathbf{X}_{\mathrm{subbands}} = [c_l \,\|\, d_h \,\|\, d_v \,\|\, d_d]$$
+$$\mathbf{X}_{\mathrm{subbands}} = [c_l \,\Vert\, d_h \,\Vert\, d_v \,\Vert\, d_d]$$
 
 while the high-frequency detail sub-bands bypass the encoder directly to the decoder:
 
-$$\mathbf{D} = [d_h \,\|\, d_v \,\|\, d_d]$$
+$$\mathbf{D} = [d_h \,\Vert\, d_v \,\Vert\, d_d]$$
 
 #### Exact Mathematical Invertibility (Theorem 1)
 Because the lifting equations form a lower-triangular uncoupled system, the forward transform is exactly invertible with zero numerical information loss:
@@ -257,7 +257,7 @@ $$
 
 Interlacing the polyphase components back onto the Cartesian grid recovers the full-resolution tensor with zero reconstruction error:
 
-$$\|\mathbf{X} - \hat{\mathbf{X}}\|_{\infty} = 0$$
+$$\left\Vert \mathbf{X} - \hat{\mathbf{X}} \right\Vert_{\infty} = 0$$
 
 ---
 
@@ -295,11 +295,11 @@ $$\frac{\partial f_{\mathrm{GeM}}}{\partial p} = \frac{f_{\mathrm{GeM}}}{p} \lef
 #### Skip-Connection Feature Alignment Loss
 To eliminate semantic divergence between encoder skip representations and transposed-convolution upsampled decoder features, we supervise skip bridges across stages $l \in \{1, 2, 3, 4\}$ with a feature alignment objective $\mathcal{L}_{\mathrm{feat}}$:
 
-$$\mathcal{L}_{\mathrm{feat}} = \sum_{l=1}^{4} \mathrm{MSE}\left( \frac{\mathbf{u}_l^r}{\|\mathbf{u}_l^r\|_2 + \epsilon}, \, \frac{\mathbf{s}_l^r}{\|\mathbf{s}_l^r\|_2 + \epsilon} \right)$$
+$$\mathcal{L}_{\mathrm{feat}} = \sum_{l=1}^{4} \mathrm{MSE}\left( \frac{\mathbf{u}_l^r}{\Vert \mathbf{u}_l^r \Vert_2 + \epsilon}, \, \frac{\mathbf{s}_l^r}{\Vert \mathbf{s}_l^r \Vert_2 + \epsilon} \right)$$
 
 Expanding the normalized squared Euclidean distance:
 
-$$\left\| \frac{\mathbf{u}}{\|\mathbf{u}\|_2} - \frac{\mathbf{s}}{\|\mathbf{s}\|_2} \right\|_2^2 = 2\big(1 - \cos(\theta)\big)$$
+$$\left\Vert \frac{\mathbf{u}}{\Vert \mathbf{u} \Vert_2} - \frac{\mathbf{s}}{\Vert \mathbf{s} \Vert_2} \right\Vert_2^2 = 2\big(1 - \cos(\theta)\big)$$
 
 Minimizing $\mathcal{L}_{\mathrm{feat}}$ is mathematically identical to maximizing cosine similarity in the latent subspace, preventing representation drift across skip bridges.
 
@@ -398,16 +398,16 @@ Deep supervision is applied across the primary decoder head and auxiliary decode
 $$\mathcal{L}_{\mathrm{seg}}^{\mathrm{total}} = \mathcal{L}_{\mathrm{seg}}(\mathbf{z}_{\mathrm{main}}) + 0.4 \mathcal{L}_{\mathrm{seg}}(\mathbf{z}_{\mathrm{aux3}}) + 0.2 \mathcal{L}_{\mathrm{seg}}(\mathbf{z}_{\mathrm{aux2}})$$
 
 #### HoVer Distance-to-Centroid Regression
-Continuous horizontal and vertical distance-to-centroid fields $\mathbf{T}^* = (h^*, v^*) \in [-1, 1]^2$ are regressed via objective $\mathcal{L}_{\mathrm{hv}}$ using a combination of Mean Squared Error and foreground Mean Squared Gradient Error (MSGE):
+Continuous horizontal and vertical distance-to-centroid fields $\mathbf{T}^{\ast} = (h^{\ast}, v^{\ast}) \in [-1, 1]^{2}$ are regressed via objective $\mathcal{L}_{\mathrm{hv}}$ using a combination of Mean Squared Error and foreground Mean Squared Gradient Error (MSGE):
 
-$$\mathcal{L}_{\mathrm{msge}} = \frac{1}{|\mathrm{ROI}|} \sum_{i \in \mathrm{ROI}} \Big[ (\nabla_x \hat{\mathbf{T}}_i - \nabla_x \mathbf{T}^*_i)^2 + (\nabla_y \hat{\mathbf{T}}_i - \nabla_y \mathbf{T}^*_i)^2 \Big]$$
+$$\mathcal{L}_{\mathrm{msge}} = \frac{1}{|\mathrm{ROI}|} \sum_{i \in \mathrm{ROI}} \Big[ (\nabla_x \hat{\mathbf{T}}_i - \nabla_x \mathbf{T}^{\ast}_{i})^2 + (\nabla_y \hat{\mathbf{T}}_i - \nabla_y \mathbf{T}^{\ast}_{i})^2 \Big]$$
 
 Supervising directional spatial derivatives $\nabla_x$ and $\nabla_y$ enforces steep slope transitions across nuclear margins, preventing flat gradient artifacts in downstream watershed flooding.
 
 #### Boundary Consistency Objective
 To penalize blurry transitions and encourage sharp perimeter alignment, the discrepancy between predicted and ground-truth Sobel gradient magnitudes is penalized via an $L_1$ norm $\mathcal{L}_{\mathrm{bnd}}$:
 
-$$\mathcal{L}_{\mathrm{bnd}} = \big\| \, |\nabla_S \sigma(\mathbf{z})| - |\nabla_S \mathbf{M}_{\mathrm{gt}}| \, \big\|_1$$
+$$\mathcal{L}_{\mathrm{bnd}} = \left\Vert |\nabla_S \sigma(\mathbf{z})| - |\nabla_S \mathbf{M}_{\mathrm{gt}}| \right\Vert_1$$
 
 ---
 
