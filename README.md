@@ -179,6 +179,9 @@ This leads to catastrophic under-segmentation. Nuclear instance segmentation res
 $$\mathbf{Y}_{\mathrm{inst}}(y, x) = \begin{cases} k, & \text{if } (y, x) \in \Omega_k \\ 0, & \text{if } (y, x) \in \text{background} \end{cases}$$
 
 subject to the mutual exclusion constraint $\Omega_i \cap \Omega_j = \emptyset$ for all $i \neq j$.
+subject to the pairwise mutual exclusion constraint:
+
+$$\Omega_i \cap \Omega_j = \emptyset, \quad \forall i \neq j$$
 
 ---
 
@@ -189,11 +192,15 @@ To circumvent the irreversible boundary blurring caused by max-pooling and strid
 An incoming feature map $\mathbf{X} \in \mathbb{R}^{C \times H \times W}$ is partitioned into four non-overlapping sub-grids sampled on even and odd spatial coordinates:
 
 $$\begin{aligned}
+$$
+\begin{aligned}
 x_{00}(c, i, j) &= \mathbf{X}(c, 2i, 2j)     && \text{(Reference Component - Even rows, Even cols)} \\
 x_{01}(c, i, j) &= \mathbf{X}(c, 2i, 2j + 1) && \text{(Horizontal Component - Even rows, Odd cols)} \\
 x_{10}(c, i, j) &= \mathbf{X}(c, 2i + 1, 2j) && \text{(Vertical Component - Odd rows, Even cols)} \\
 x_{11}(c, i, j) &= \mathbf{X}(c, 2i + 1, 2j + 1) && \text{(Diagonal Component - Odd rows, Odd cols)}
 \end{aligned}$$
+\end{aligned}
+$$
 
 where each polyphase component has reduced spatial dimensions $\mathbb{R}^{C \times \frac{H}{2} \times \frac{W}{2}}$.
 
@@ -208,10 +215,14 @@ The calibrated spatial representation is obtained via channel broadcasting: $S(x
 Three dedicated depthwise convolutional operators predict detail components from reference sub-grid $x_{00}$:
 
 $$\begin{aligned}
+$$
+\begin{aligned}
 d_h &= x_{01} - S_h\big(x_{00}, \mathcal{P}_h(x_{00})\big) \\
 d_v &= x_{10} - S_v\big(x_{00}, \mathcal{P}_v(x_{00})\big) \\
 d_d &= x_{11} - S_d\big(x_{00}, \mathcal{P}_d(x_{00})\big)
 \end{aligned}$$
+\end{aligned}
+$$
 
 where:
 
@@ -225,6 +236,13 @@ The coarse approximation $c_l$ is synthesized by incorporating detail sub-bands 
 $$c_l = x_{00} + k_h \mathcal{U}_h(d_h) + k_v \mathcal{U}_v(d_v) + k_d \mathcal{U}_d(d_d)$$
 
 The complete sub-band representation $\mathbf{X}_{\mathrm{subbands}} = [c_l \,\|\, d_h \,\|\, d_v \,\|\, d_d]$ is projected via $1\times1$ convolution, while the detail sub-bands $\mathbf{D} = [d_h \,\|\, d_v \,\|\, d_d]$ bypass the encoder directly to the decoder.
+The complete sub-band representation is projected via a $1\times1$ convolution:
+
+$$\mathbf{X}_{\mathrm{subbands}} = [c_l \,\|\, d_h \,\|\, d_v \,\|\, d_d]$$
+
+while the high-frequency detail sub-bands bypass the encoder directly to the decoder:
+
+$$\mathbf{D} = [d_h \,\|\, d_v \,\|\, d_d]$$
 
 #### Exact Mathematical Invertibility (Theorem 1)
 Because the lifting equations form a lower-triangular uncoupled system, the forward transform is exactly invertible with zero numerical information loss:
@@ -232,10 +250,14 @@ Because the lifting equations form a lower-triangular uncoupled system, the forw
 $$x_{00} = c_l - \Big( k_h \mathcal{U}_h(d_h) + k_v \mathcal{U}_v(d_v) + k_d \mathcal{U}_d(d_d) \Big)$$
 
 $$\begin{aligned}
+$$
+\begin{aligned}
 x_{01} &= d_h + S_h\big(x_{00}, \mathcal{P}_h(x_{00})\big) \\
 x_{10} &= d_v + S_v\big(x_{00}, \mathcal{P}_v(x_{00})\big) \\
 x_{11} &= d_d + S_d\big(x_{00}, \mathcal{P}_d(x_{00})\big)
 \end{aligned}$$
+\end{aligned}
+$$
 
 Interlacing $x_{mn}$ back onto the Cartesian grid recovers the full-resolution tensor with reconstruction error $\|\mathbf{X} - \hat{\mathbf{X}}\|_{\infty} = 0$.
 
@@ -274,6 +296,8 @@ $$\frac{\partial f_{\mathrm{GeM}}}{\partial p} = \frac{f_{\mathrm{GeM}}}{p} \lef
 
 #### Skip-Connection Feature Alignment Loss ($\mathcal{L}_{\mathrm{feat}}$)
 To eliminate semantic divergence between encoder skip representations and transposed-convolution upsampled decoder features, we supervise skip bridges across stages $l \in \{1, 2, 3, 4\}$:
+#### Skip-Connection Feature Alignment Loss
+To eliminate semantic divergence between encoder skip representations and transposed-convolution upsampled decoder features, we supervise skip bridges across stages $l \in \{1, 2, 3, 4\}$ with a feature alignment objective $\mathcal{L}_{\mathrm{feat}}$:
 
 $$\mathcal{L}_{\mathrm{feat}} = \sum_{l=1}^{4} \mathrm{MSE}\left( \frac{\mathbf{u}_l^r}{\|\mathbf{u}_l^r\|_2 + \epsilon}, \, \frac{\mathbf{s}_l^r}{\|\mathbf{s}_l^r\|_2 + \epsilon} \right)$$
 
@@ -287,14 +311,25 @@ Minimizing $\mathcal{L}_{\mathrm{feat}}$ is mathematically identical to maximizi
 
 ### 4. Atrous Spatial Pyramid Pooling (ASPP) Bottleneck
 At the bottleneck, feature maps reach dimension $\frac{H}{16} \times \frac{W}{16}$ with 512 channels. An ASPP module enlarges the effective receptive field $K_{\mathrm{eff}} = K + (K - 1)(r - 1)$ across dilation rates $r \in \{1, 4, 7\}$.
+At the bottleneck, feature maps reach dimension $\frac{H}{16} \times \frac{W}{16}$ with 512 channels. An ASPP module enlarges the effective receptive field across dilation rates $r \in \{1, 4, 7\}$:
 
 Standard $3\times3$ convolutions on 512-channel tensors require $\text{FLOPs}_{\mathrm{std}} = 18 \cdot C^2 \cdot HW$. We deploy depthwise-separable convolutions:
 - Depthwise FLOPs: $18 \cdot C \cdot HW$
 - Pointwise FLOPs: $2 \cdot C^2 \cdot HW$
+$$K_{\mathrm{eff}} = K + (K - 1)(r - 1)$$
+
+Standard $3\times3$ convolutions on 512-channel tensors require quadratic FLOPs:
+
+$$\mathrm{FLOPs}_{\mathrm{std}} = 18 \cdot C^2 \cdot HW$$
+
+We deploy depthwise-separable convolutions to decouple spatial and cross-channel filtering:
+
+$$\mathrm{FLOPs}_{\mathrm{dw}} = 18 \cdot C \cdot HW, \qquad \mathrm{FLOPs}_{\mathrm{pw}} = 2 \cdot C^2 \cdot HW$$
 
 The computational reduction ratio is:
 
 $$\mathcal{R} = \frac{\text{FLOPs}_{\mathrm{dw}} + \text{FLOPs}_{\mathrm{pw}}}{\text{FLOPs}_{\mathrm{std}}} = \frac{1}{C} + \frac{1}{9} \approx 11.2\% \quad (\approx 8.9\times \text{ reduction})$$
+$$\mathcal{R} = \frac{\mathrm{FLOPs}_{\mathrm{dw}} + \mathrm{FLOPs}_{\mathrm{pw}}}{\mathrm{FLOPs}_{\mathrm{std}}} = \frac{1}{C} + \frac{1}{9} \approx 11.2\% \quad (\approx 8.9\times \text{ reduction})$$
 
 ---
 
@@ -334,8 +369,12 @@ $$\mathcal{S}_g(h) = \sup_{\alpha \in [0, 1]} \Big[ \alpha \wedge g\big(\{x \in 
 for predicted probabilities $p_1, p_2 \in [0, 1]$ simplifies to the closed-form equation:
 
 $$p_{\mathrm{fused}} = \max\Big( \min\big(\max(p_1, p_2), \, g_{\max}\big), \, \min(p_1, p_2) \Big)$$
+$$p_{\mathrm{fused}} = \max\Big( \min\big(\max(p_1, p_2), \, g_{\mathrm{max}}\big), \, \min(p_1, p_2) \Big)$$
 
 where $g_{\max} = g_1$ if $p_1 \ge p_2$, else $g_2$.
+where the maximal density $g_{\mathrm{max}}$ is selected dynamically:
+
+$$g_{\mathrm{max}} = \begin{cases} g_1, & \text{if } p_1 \ge p_2 \\ g_2, & \text{otherwise} \end{cases}$$
 
 #### Differentiable Logit Reconstruction
 Densities $g_1$ and $g_2$ are parameterized as unconstrained logits $\theta_1, \theta_2 \in \mathbb{R}$:
@@ -356,12 +395,38 @@ with $\lambda_f = 0.1$, $\lambda_{hv} = 1.0$, and $\lambda_b = 0.15$.
   $$TI(\mathbf{p}, \mathbf{y}) = \frac{\sum_{i} p_i y_i + \epsilon}{\sum_{i} p_i y_i + \alpha \sum_{i} p_i(1 - y_i) + \beta \sum_{i} (1 - p_i)y_i + \epsilon}$$
   $$\mathcal{L}_{\mathrm{FT}} = \big(1 - TI(\mathbf{p}, \mathbf{y})\big)^{0.75}$$
   $$\mathcal{L}_{\mathrm{seg}}^{\mathrm{total}} = \mathcal{L}_{\mathrm{seg}}(\mathbf{z}_{\mathrm{main}}) + 0.4 \mathcal{L}_{\mathrm{seg}}(\mathbf{z}_{\mathrm{aux3}}) + 0.2 \mathcal{L}_{\mathrm{seg}}(\mathbf{z}_{\mathrm{aux2}})$$
+The overall multi-task training objective balances semantic segmentation, skip representation alignment, distance map regression, and boundary edge sharpness:
 
 - **HoVer Distance Regression ($\mathcal{L}_{hv}$):** Distance maps $h^*, v^* \in [-1, 1]$ are regressed using combined MSE and foreground Mean Squared Gradient Error (MSGE):
   $$\mathcal{L}_{\mathrm{msge}} = \frac{1}{|\mathrm{ROI}|} \sum_{i \in \mathrm{ROI}} \Big[ (\nabla_x \hat{\mathbf{T}}_i - \nabla_x \mathbf{T}^*_i)^2 + (\nabla_y \hat{\mathbf{T}}_i - \nabla_y \mathbf{T}^*_i)^2 \Big]$$
+$$\mathcal{L}_{\mathrm{total}} = \mathcal{L}_{\mathrm{seg}} + \lambda_{\mathrm{feat}} \mathcal{L}_{\mathrm{feat}} + \lambda_{\mathrm{hv}} \mathcal{L}_{\mathrm{hv}} + \lambda_{\mathrm{bnd}} \mathcal{L}_{\mathrm{bnd}}$$
 
 - **Boundary Consistency Objective ($\mathcal{L}_{\mathrm{boundary}}$):** Discrepancy between Sobel gradient magnitudes:
   $$\mathcal{L}_{\mathrm{boundary}} = \big\| \, |\nabla_S \sigma(\mathbf{z})| - |\nabla_S \mathbf{M}_{\mathrm{gt}}| \, \big\|_1$$
+where loss weight coefficients are empirically balanced to $\lambda_{\mathrm{feat}} = 0.1$, $\lambda_{\mathrm{hv}} = 1.0$, and $\lambda_{\mathrm{bnd}} = 0.15$.
+
+#### Semantic Segmentation Objective
+The semantic segmentation loss $\mathcal{L}_{\mathrm{seg}}$ combines Focal Tversky (FT) loss with positive-weighted Binary Cross-Entropy (BCE) to address foreground-background class imbalance:
+
+$$TI(\mathbf{p}, \mathbf{y}) = \frac{\sum_{i} p_i y_i + \epsilon}{\sum_{i} p_i y_i + \alpha \sum_{i} p_i(1 - y_i) + \beta \sum_{i} (1 - p_i)y_i + \epsilon}$$
+
+$$\mathcal{L}_{\mathrm{FT}} = \big(1 - TI(\mathbf{p}, \mathbf{y})\big)^{0.75}$$
+
+Deep supervision is applied across the primary decoder head and auxiliary decoder stages D3 and D2:
+
+$$\mathcal{L}_{\mathrm{seg}}^{\mathrm{total}} = \mathcal{L}_{\mathrm{seg}}(\mathbf{z}_{\mathrm{main}}) + 0.4 \mathcal{L}_{\mathrm{seg}}(\mathbf{z}_{\mathrm{aux3}}) + 0.2 \mathcal{L}_{\mathrm{seg}}(\mathbf{z}_{\mathrm{aux2}})$$
+
+#### HoVer Distance-to-Centroid Regression
+Continuous horizontal and vertical distance-to-centroid fields $\mathbf{T}^* = (h^*, v^*) \in [-1, 1]^2$ are regressed via objective $\mathcal{L}_{\mathrm{hv}}$ using a combination of Mean Squared Error and foreground Mean Squared Gradient Error (MSGE):
+
+$$\mathcal{L}_{\mathrm{msge}} = \frac{1}{|\mathrm{ROI}|} \sum_{i \in \mathrm{ROI}} \Big[ (\nabla_x \hat{\mathbf{T}}_i - \nabla_x \mathbf{T}^*_i)^2 + (\nabla_y \hat{\mathbf{T}}_i - \nabla_y \mathbf{T}^*_i)^2 \Big]$$
+
+Supervising directional spatial derivatives $\nabla_x$ and $\nabla_y$ enforces steep slope transitions across nuclear margins, preventing flat gradient artifacts in downstream watershed flooding.
+
+#### Boundary Consistency Objective
+To penalize blurry transitions and encourage sharp perimeter alignment, the discrepancy between predicted and ground-truth Sobel gradient magnitudes is penalized via an $L_1$ norm $\mathcal{L}_{\mathrm{bnd}}$:
+
+$$\mathcal{L}_{\mathrm{bnd}} = \big\| \, |\nabla_S \sigma(\mathbf{z})| - |\nabla_S \mathbf{M}_{\mathrm{gt}}| \, \big\|_1$$
 
 ---
 
@@ -372,6 +437,29 @@ with $\lambda_f = 0.1$, $\lambda_{hv} = 1.0$, and $\lambda_b = 0.15$.
 - **Marker-Controlled Watershed:** Seed markers are extracted from low-gradient foreground regions:
   $$\mathbf{S}_{\mathrm{seed}} = \big(\tilde{\mathbf{G}} < \tau_{\mathrm{seed}}\big) \land \big(\hat{p}_{\mathrm{fused}} \ge 0.5\big)$$
   and eroded by a flat disk structuring element $\mathcal{B}_{r_{\mathrm{erode}}}$ before flooding across $\tilde{\mathbf{G}}$ within the binary foreground mask. Spurious instances smaller than 10 pixels are pruned.
+
+#### 2D Raised-Cosine Tile Blending
+During inference on large whole slide images, predictions across overlapping $256 \times 256$ patches (stride 192) are blended using a separable 2D Hanning window:
+
+$$\mathbf{W}(i, j) = \max\big(w(i), 0.1\big) \cdot \max\big(w(j), 0.1\big)$$
+
+This continuous bell-shaped taper attenuates boundary tiling seams and guarantees smooth, seamless transitions across tile boundaries.
+
+#### Topological Energy Landscape
+Continuous horizontal and vertical distance predictions $(\hat{\mathbf{H}}, \hat{\mathbf{V}})$ are transformed into an energy surface via normalized Sobel gradient magnitudes:
+
+$$\mathbf{G} = \max\big(|\nabla \hat{\mathbf{H}}|, \, |\nabla \hat{\mathbf{V}}|\big)$$
+
+$$\tilde{\mathbf{G}} = \frac{\mathbf{G} - \min(\mathbf{G})}{\max(\mathbf{G}) - \min(\mathbf{G}) + \epsilon}$$
+
+Nuclear boundaries generate sharp ridges, while cell interiors form deep, smooth catchment basins.
+
+#### Marker-Controlled Watershed Instance Decoding
+Discrete nuclear seed markers $\mathbf{S}_{\mathrm{seed}}$ are identified within high-confidence foreground regions exhibiting minimal gradient energy:
+
+$$\mathbf{S}_{\mathrm{seed}} = \big(\tilde{\mathbf{G}} < \tau_{\mathrm{seed}}\big) \land \big(\hat{p}_{\mathrm{fused}} \ge 0.5\big)$$
+
+The seed markers are morphologically eroded using a flat disk structuring element $\mathcal{B}_{r_{\mathrm{erode}}}$ (radius $r_{\mathrm{erode}} = 2$) and flooded across the energy landscape $\tilde{\mathbf{G}}$, strictly constrained within the Sugeno binary foreground mask. Spurious instances with an area smaller than 10 pixels are automatically pruned.
 
 ---
 
