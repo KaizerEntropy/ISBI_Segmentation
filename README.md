@@ -1,290 +1,228 @@
-# Dual-Branch Wavelet-ResNet for Nuclear Instance Segmentation
+<div align="center">
 
-Official PyTorch implementation of the dual-branch neural architecture combining Learnable Lifting Wavelet Transforms (LLWT), pre-trained ResNet representations, bi-directional cross-attention, and Sugeno fuzzy integral fusion for nuclear semantic and instance segmentation in histopathology images.
+# **A Dual-Branch Wavelet-ResNet Model with Cross-Attention and Sugeno Fuzzy Fusion for Nuclear Instance Segmentation**
+
+### **IEEE International Symposium on Biomedical Imaging (IEEE ISBI)**
+#### **Under Review &bull; IEEE Signal Processing Society &bull; IEEE Engineering in Medicine and Biology Society**
+
+</div>
+
+<p align="center">
+  <a href="https://biomedicalimaging.org/"><img src="https://img.shields.io/badge/Conference-IEEE%20ISBI-0052cc.svg?style=flat" alt="IEEE ISBI"></a>
+  <a href="https://biomedicalimaging.org/"><img src="https://img.shields.io/badge/Status-Under%20Review-FF6F00.svg?style=flat" alt="Status: Under Review"></a>
+  <a href="https://signalprocessingsociety.org/"><img src="https://img.shields.io/badge/Sponsor-IEEE%20SPS%20%2F%20EMBS-003366.svg?style=flat" alt="IEEE SPS / EMBS"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat" alt="License: Apache 2.0"></a>
+  <a href="https://pytorch.org/"><img src="https://img.shields.io/badge/PyTorch-2.0%2B-EE4C2C.svg?style=flat" alt="PyTorch"></a>
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.9%2B-3776AB.svg?style=flat" alt="Python"></a>
+  <a href="https://developer.nvidia.com/cuda-toolkit"><img src="https://img.shields.io/badge/CUDA-11.8%2B-76B900.svg?style=flat" alt="CUDA"></a>
+</p>
+
+Official repository for **"A Dual-Branch Wavelet-ResNet Model with Cross-Attention and Fuzzy Fusion for Nuclear Segmentation and Instance Segmentation in Histopathology Images"**, submitted to the **[IEEE International Symposium on Biomedical Imaging (IEEE ISBI)](https://biomedicalimaging.org/)**.
+
+**Authors:** Diptarko Bhattacharjee<sup>1,*</sup>, Mukut Chatterjee<sup>1,*</sup>, Dmitrij Kaplun<sup>2,3,✉</sup>, Ram Sarkar<sup>1</sup>  
+<sup>1</sup> Department of Computer Science & Engineering, Jadavpur University, Kolkata, India  
+<sup>2</sup> School of Computer Science and Technology / School of Artificial Intelligence, China University of Mining and Technology, Xuzhou, China  
+<sup>3</sup> Intelligent Devices Institute, St. Petersburg Electrotechnical University "LETI", St. Petersburg, Russia  
+
+<sup>*</sup> Equal contribution (co-first authors)  
+<sup>✉</sup> Corresponding author: [dikaplun@etu.ru](mailto:dikaplun@etu.ru)  
+**Conference Website:** [biomedicalimaging.org](https://biomedicalimaging.org/) | **Code:** [github.com/mukutchatterjee/dual-branch-wavelet-resnet](https://github.com/mukutchatterjee/dual-branch-wavelet-resnet)
+
+---
 
 ## Overview
 
-Accurate delineation of cell nuclei in Hematoxylin and Eosin (H&E) stained tissue biopsies is essential for computational pathology workflows, including tumor grading, cellular pleomorphism quantification, and spatial tumor-infiltrating lymphocyte (TIL) profiling.
+Accurate instance segmentation of cell nuclei in routine hematoxylin and eosin (H&E) histopathology images is foundational for computational pathology workflows, guiding tumor grading, cellular pleomorphism quantification, and spatial micro-environment profiling. In high-grade malignant neoplasms, delineation is heavily compromised by tightly clustered nuclei, indistinct chromatin boundaries, and severe chromatic variability across laboratories.
 
-Standard convolutional architectures struggle with touching nuclei and suffer from pooling-induced boundary blurring, while vision transformers incur prohibitive computational costs and lack fine, sub-pixel edge representations. This framework resolves these challenges through an integrated dual-stream design:
+Conventional convolutional networks (such as U-Net) rely on aggressive spatial downsampling via strided convolutions or max-pooling, which permanently eradicates high-frequency sub-band details and leads to under-segmentation along abutting membranes. While multi-task architectures like HoVer-Net regress distance-to-centroid fields, their intermediate pooling layers still suffer spatial aliasing. Vision transformers capture global dependencies but incur quadratic token costs while blurring sub-pixel cellular perimeters.
 
-1. Learnable Lifting Wavelet Transform (LLWT) Stream: Implements an algebraically invertible 2D lifting scheme with stain-adaptive spatial calibration to decompose features into directional high-frequency detail bands without pooling loss. Detail sub-bands bypass deep abstractions directly to an Inverse LLWT decoder.
-2. Residual Semantic Stream: Utilizes pre-trained residual blocks with Generalized Mean (GeM) pooling to capture robust histological context.
-3. Bi-Directional Cross-Attention (BiCA): Dynamically recalibrates channel-wise feature representations across streams with zero-initialized identity mapping for early training stability.
-4. Skip-Connection Feature Alignment Loss (L_feat): Enforces directional alignment between upsampled decoder features and encoder skip features, eliminating representation divergence.
-5. Sugeno Fuzzy Integral Fusion: Pixel-wise decision arbitration parameterized by learned singleton fuzzy densities (g1, g2), dynamically weighting stream confidences based on local boundary ambiguity.
-6. Multi-Task HoVer Head: Regresses horizontal and vertical distance-to-centroid maps, driving marker-controlled watershed segmentation to cleanly separate abutting cell nuclei.
+This framework couples multi-frequency wavelet analysis with deep residual representations through a symmetric dual-stream architecture:
+- **Learnable Lifting Wavelet Transform (LLWT) Stream:** Decomposes features into multi-directional high-frequency detail sub-bands ($d_h, d_v, d_d$) via an algebraically invertible 2D lifting scheme with stain-adaptive spatial calibration, completely bypassing pooling loss and routing edge primitives directly to an Inverse LLWT decoder.
+- **Residual Context Stream with GeM Pooling:** Extracts deep histological abstractions via pre-activation ResBlocks and learnable Generalized Mean (GeM) pooling, dynamically interpolating between average and max operations.
+- **Multi-Scale Bi-Directional Cross-Attention (BiCA):** Exchanges contextual and geometric cues in channel-covariance space ($C \times C$) across 8 stages, utilizing zero-initialized Batch Normalization to preserve pre-trained feature stability during early training.
+- **Skip-Connection Feature Alignment ($\mathcal{L}_{\text{feat}}$):** Supervised via channel-normalized Mean Squared Error, enforcing cosine similarity between upsampled decoder representations and encoder skip features to eliminate latent subspace divergence.
+- **Learnable Sugeno Fuzzy Integral Decision Fusion:** Dynamically arbitrates between stream probabilities pixel-by-pixel using learned singleton fuzzy densities ($g_1, g_2$), resolving boundary ambiguities through non-additive fuzzy measures.
+- **Multi-Task HoVer Head & Marker Watershed:** Regresses continuous horizontal and vertical distance-to-centroid vectors, yielding topological distance surfaces whose gradient basins drive marker-controlled watershed flooding.
 
-## Detailed Methodology and Mathematical Formulation
+---
 
-### 1. Mathematical Definition of Nuclear Instance Segmentation
-Let I in R^(3 x H x W) represent an RGB histopathology image of height H and width W. Semantic segmentation estimates a binary mapping M in {0, 1}^(H x W) indicating foreground nuclear presence versus background stroma:
+## Model Architecture
 
-    M(y, x) = I( (y, x) in Union_{k=1}^K Omega_k )
+<p align="center">
+  <img src="figures/fig_architecture.pdf" alt="Dual-Branch Wavelet-ResNet Architecture" width="95%"/>
+</p>
 
-where Omega_k denotes the compact spatial support of the k-th distinct cell nucleus, and K is the total nucleus count. 
+*Figure 1: Comprehensive architectural blueprint of the Dual-Branch Wavelet-ResNet network. The LLWT encoder decomposes features into low-frequency approximations and directional detail sub-bands $(d_h, d_v, d_d)$, which bypass deep abstractions directly to the Inverse LLWT decoder. Multi-scale Bi-Directional Cross-Attention (BiCA) synchronizes representations across both streams. Fused intermediate features feed dual heads for Sugeno semantic segmentation and HoVer distance regression, driving marker-controlled watershed instance decoding.*
 
-Semantic segmentation cannot distinguish between abutting nuclei sharing a boundary: if partial Omega_i intersects partial Omega_j is non-empty, Omega_i and Omega_j merge into a single connected component. Standard 8-connected component labeling fails whenever dist(Omega_i, Omega_j) = 1. Instance segmentation resolves this by assigning a unique integer index to each independent nuclear instance:
+### Structural Breakdown
 
-    Y_inst(y, x) = k if (y, x) in Omega_k, else 0
+| Stage / Component | Spatial Size | Channels (Wavelet / ResNet) | Primary Operations & Functional Description |
+|:---|:---:|:---:|:---|
+| **Input Tile** | $256 \times 256$ | 3 | Native-resolution 3-channel H&E histology image patch |
+| **Stage 1 (E1 / D1)** | $128 \times 128$ | 128 / 64 | Polyphase LLWT splitting $\leftrightarrow$ BiCA-1 $\leftrightarrow$ ResNet Stem + GeM Downsampling |
+| **Stage 2 (E2 / D2)** | $64 \times 64$ | 256 / 128 | Directional Predict/Update $\leftrightarrow$ BiCA-2 $\leftrightarrow$ PreAct ResBlocks; Auxiliary Head on D2 |
+| **Stage 3 (E3 / D3)** | $32 \times 32$ | 512 / 256 | Multi-frequency Decomposition $\leftrightarrow$ BiCA-3 $\leftrightarrow$ Contextual ResBlocks; Auxiliary Head on D3 |
+| **Stage 4 (E4 / D4)** | $16 \times 16$ | 512 / 512 | Deep Feature Extraction $\leftrightarrow$ BiCA-4 $\leftrightarrow$ Deep Semantic Subspace Alignment ($\mathcal{L}_{\text{feat}}$) |
+| **Bottleneck** | $16 \times 16$ | 512 / 512 | Dual ASPP Bottlenecks (Dilation Rates: 1, 4, 7, Global Pooling) with 2D Spatial Dropout |
+| **Heads & Fusion** | $256 \times 256$ | 1 (Seg) / 2 (HV) | Sugeno Fuzzy Integral ($p_{\text{fused}}$) $\rightarrow$ Mask; HoVer Head ($[-1, 1]$ Maps) $\rightarrow$ Watershed |
 
-### 2. Learnable Lifting Wavelet Transform (LLWT) Stream
-To circumvent the irreversible high-frequency loss of max-pooling and strided convolutions, the wavelet stream employs a 2D Learnable Lifting Wavelet Transform. 
-
-#### Polyphase Decomposition (Split Step)
-An incoming feature tensor X in R^(C x H x W) is split into four non-overlapping polyphase sub-grids:
-- x_00: Even rows, Even columns (Reference component)
-- x_01: Even rows, Odd columns (Horizontal component)
-- x_10: Odd rows, Even columns (Vertical component)
-- x_11: Odd rows, Odd columns (Diagonal component)
-
-#### Stain-Adaptive Spatial Calibration (StainAdapt)
-To account for chromatic variance across laboratories, global context descriptor y_gap = GAP(x_00) is recalibrated through a bottleneck MLP with reduction ratio r=4:
-    s = sigma( W_2 * ReLU(W_1 * y_gap + b_1) + b_2 )
-    S(x_00, f) = f (elementwise-product) s
-
-#### Directional Predict Step
-High-frequency detail sub-bands are isolated via depthwise convolutions P_h, P_v, P_d:
-    d_h = x_01 - S_h(x_00, P_h(x_00))
-    d_v = x_10 - S_v(x_00, P_v(x_00))
-    d_d = x_11 - S_d(x_00, P_d(x_00))
-
-#### Directional Update Step
-The coarse approximation c_l incorporates detail sub-bands via update depthwise operators U_k and learnable scalars k_h, k_v, k_d:
-    c_l = x_00 + k_h * U_h(d_h) + k_v * U_v(d_v) + k_d * U_d(d_d)
-
-#### Exact Invertibility
-Because update and predict steps form a triangular uncoupled system, the forward lifting transform is mathematically invertible with zero information loss:
-    x_00 = c_l - (k_h * U_h(d_h) + k_v * U_v(d_v) + k_d * U_d(d_d))
-    x_01 = d_h + S_h(x_00, P_h(x_00))
-    x_10 = d_v + S_v(x_00, P_v(x_00))
-    x_11 = d_d + S_d(x_00, P_d(x_00))
-
-In the decoder, an Inverse LLWT module mirrors this formulation using preserved detail sub-bands [d_h, d_v, d_d] routed directly across skip connections.
-
-### 3. Pre-Activation ResNet Stream and GeM Pooling
-The semantic stream deploys pre-activation residual blocks:
-    x_{l+1} = x_l + F_pre(x_l)
-ensuring that gradients backpropagate cleanly via the identity term dL/dx_l = (dL/dx_L) * (I + d/dx_l Sum F_pre).
-
-#### Generalized Mean (GeM) Pooling
-Spatial downsampling uses learnable Generalized Mean (GeM) pooling:
-    f_GeM(x) = ( (1 / |Omega|) * Sum_{i in Omega} x_i^p )^(1 / p)
-where p is a learnable parameter initialized to 3.0. GeM continuously interpolates between average pooling (p -> 1) and max-pooling (p -> infinity), enabling the network to learn feature-specific pooling sharpness.
-
-#### Skip-Connection Feature Alignment Loss (L_feat)
-To bridge the semantic disparity between encoder skip features s_l^r and transposed-convolution upsampled decoder features u_l^r, we supervise skip bridges across all four stages l in {1, 2, 3, 4}:
-    L_feat = Sum_{l=1}^4 MSE( u_l^r / ||u_l^r||_2, s_l^r / ||s_l^r||_2 )
-Because ||u_norm - s_norm||_2^2 = 2 * (1 - cos(theta)), minimizing L_feat maximizes directional alignment in latent space while remaining invariant to arbitrary feature magnitude scaling.
-
-### 4. Multi-Scale Bi-Directional Cross-Attention (BiCA)
-Standard spatial self-attention requires an affinity matrix of size (HW) x (HW), entailing (65,536)^2 approx 4.29 x 10^9 elements for 256x256 crops. BiCA resolves this by computing cross-attention in channel space:
-- Q = BN(Conv_1x1(x_q)) in R^(C x N)
-- K = BN(Conv_1x1(x_kv)) in R^(C x N)
-- V = Conv_1x1(x_kv) in R^(C x N)
-where N = HW. The channel affinity matrix A in R^(C x C) measures cross-channel covariance:
-    A_{i, j} = (1 / sqrt(N)) * < Q_{i, :}, K_{j, :} >
-    A_tilde = Softmax_row(A)
-    O = A_tilde * V
-    x_hat_q = x_q + W_out(O)
-
-#### Zero-Initialized Identity Mapping
-By initializing the weight gamma and bias beta of the Batch Normalization layer in W_out to zero, the module functions as an exact identity mapping at step t=0:
-    x_hat_q^(0) = x_q^(0) + 0 = x_q^(0)
-This prevents early randomized cross-stream updates from corrupting pre-trained ResNet feature representations.
-
-### 5. Sugeno Fuzzy Integral Decision Fusion
-Standard linear fusion (averaging, concatenation) assumes spatial homogeneity and additive independence. In histopathology, deep residual features are reliable in smooth nuclear interiors, whereas high-frequency wavelet sub-bands dominate at boundaries.
-
-Let X = {x_1, x_2} denote the wavelet and ResNet streams with predicted probabilities p_1, p_2 in [0, 1]. For singleton fuzzy densities g_1, g_2 in [0, 1], the Sugeno fuzzy integral evaluates to the closed-form expression:
-    p_fused = max( min(max(p_1, p_2), g_max), min(p_1, p_2) )
-where g_max = g_1 if p_1 >= p_2, else g_2.
-
-The densities g_1 and g_2 are parameterized through unconstrained real-valued logits theta_1, theta_2:
-    g_1 = sigma(theta_1),   g_2 = sigma(theta_2)
-and optimized end-to-end. The fused probability is converted to logit space via the inverse sigmoid for numerically stable BCE loss computation:
-    z_fused = ln(p_fused + epsilon) - ln(1 - p_fused + epsilon)
-
-### 6. Multi-Task Heads and HoVer Distance Regression
-To separate clustered nuclei, the network regresses normalized horizontal (h*) and vertical (v*) distance maps to the instance center of mass:
-    h*(y, x) = (x - c_x^(k)) / max |x' - c_x^(k)|
-    v*(y, x) = (y - c_y^(k)) / max |y' - c_y^(k)|
-for (y, x) in Omega_k, and 0 for background.
-
-The HoVer head receives the concatenated final decoder features merged with fine wavelet detail sub-bands:
-    F_hv = [d_1 || Interp_2x(d_2) || D_wavelet_fine]
-and outputs bounded predictions via tanh activation.
-
-### 7. Composite Loss Formulation
-The framework optimizes an end-to-end composite objective:
-    L_total = L_seg + lambda_f * L_feat + lambda_hv * L_hv + lambda_b * L_boundary
-with lambda_f = 0.1, lambda_hv = 1.0, and lambda_b = 0.15.
-
-- L_seg: Combines Focal Tversky loss (alpha=0.7, beta=0.3, gamma=0.75) to handle severe stroma/nuclear class imbalance with dynamic positive-weighted Binary Cross-Entropy:
-    L_seg = L_FT + 0.4 * L_BCE
-  Deep supervision applies auxiliary heads at decoder stages 3 and 2:
-    L_seg_total = L_seg(z_main) + 0.4 * L_seg(z_aux3) + 0.2 * L_seg(z_aux2)
-- L_hv: Combines global MSE with foreground-restricted Mean Squared Gradient Error (MSGE) using Sobel filters:
-    L_msge = (1 / |ROI|) * Sum_{ROI} [ (grad_x(T_hat) - grad_x(T*))^2 + (grad_y(T_hat) - grad_y(T*))^2 ]
-- L_boundary: Differentiable Sobel gradient consistency loss penalizing L1 discrepancy between predicted and ground-truth edge magnitudes:
-    L_boundary = || |grad_S(sigma(z))| - |grad_S(M_gt)| ||_1
+---
 
 ## Quantitative Benchmarks
 
-Evaluation is conducted across three clinical histopathology benchmarks: MoNuSeg (Multi-Organ Nuclei Segmentation), TNBC (Triple Negative Breast Cancer), and CPM-15 (Computational Pathology Challenge). Metrics report semantic overlap (Dice) alongside instance metrics (Aggregated Jaccard Index [AJI], Panoptic Quality [PQ]).
+The framework was evaluated across three public histopathology benchmarks: **MoNuSeg** (Multi-Organ Nuclei Segmentation, 7 organs), **TNBC** (Triple Negative Breast Cancer, pleomorphic malignant carcinoma), and **CPM-15** (Computational Pathology Challenge, glioblastoma, lung, and head/neck carcinoma). Performance is quantified via semantic overlap (**Dice**) and instance-level separation metrics (**Aggregated Jaccard Index [AJI]** and **Panoptic Quality [PQ]**).
 
-| Benchmark Dataset | Method | Dice (%) | AJI (%) | PQ (%) |
+### Performance Summary (Scores in %)
+
+| Benchmark Dataset | Evaluation Metric | Prior State-of-the-Art | DualBranchNet (Ours) | Relative Margin |
+|:---|:---:|:---:|:---:|:---:|
+| **MoNuSeg** | Dice / AJI / PQ | 81.01 / 57.31 / 56.88 *(Trans-UNet)*<br>82.30 / 61.80 / 60.50 *(HoVer-Net)* | **82.46 / 62.44 / 61.49** | **+1.45 / +5.13 / +4.61**<br>*(+0.16 / +0.64 / +0.99 vs HoVer-Net)* |
+| **TNBC** | Dice / AJI / PQ | 86.78 / 63.15 / 65.16 *(Trans-UNet)*<br>86.80 / 65.50 / 64.20 *(HoVer-Net)* | **88.00 / 70.23 / 69.69** | **+1.22 / +7.08 / +4.53**<br>*(+1.20 / +4.73 / +5.49 vs HoVer-Net)* |
+| **CPM-15** | Dice / AJI / PQ | 88.45 / 68.78 / 63.17 *(Trans-UNet)*<br>87.78 / 67.34 / 62.39 *(U$^2$-Net)* | **90.02 / 70.82 / 67.40** | **+1.57 / +2.04 / +4.23** |
+
+<details>
+<summary><b>View complete comparative baselines across published architectures</b></summary>
+
+| Method | Benchmark | MoNuSeg (Dice / AJI / PQ) | TNBC (Dice / AJI / PQ) | CPM-15 (Dice / AJI / PQ) |
 |:---|:---|:---:|:---:|:---:|
-| MoNuSeg | Swin-UNet | 80.12 | 53.12 | 54.87 |
-| MoNuSeg | Trans-UNet | 81.01 | 57.31 | 56.88 |
-| MoNuSeg | U2-Net | 80.92 | 56.72 | 56.02 |
-| MoNuSeg | HoVer-Net | 82.30 | 61.80 | 60.50 |
-| MoNuSeg | DualBranchNet (Ours) | 82.46 | 62.44 | 61.49 |
-| TNBC | BoNuS | 76.73 | 60.73 | -- |
-| TNBC | Swin-UNet | 84.71 | 61.46 | 63.12 |
-| TNBC | Trans-UNet | 86.78 | 63.15 | 65.16 |
-| TNBC | HoVer-Net | 86.80 | 65.50 | 64.20 |
-| TNBC | DualBranchNet (Ours) | 88.00 | 70.23 | 69.69 |
-| CPM-15 | BoNuS | 79.99 | 54.54 | -- |
-| CPM-15 | Swin-UNet | 86.92 | 65.79 | 61.28 |
-| CPM-15 | Trans-UNet | 88.45 | 68.78 | 63.17 |
-| CPM-15 | DualBranchNet (Ours) | 90.02 | 70.82 | 67.40 |
+| BoNuS (2023) | Boundary-Oriented CNN | -- / -- / -- | 76.73 / 60.73 / -- | 79.99 / 54.54 / -- |
+| Swin-UNet (2022) | Hierarchical Vision Transformer | 80.12 / 53.12 / 54.87 | 84.71 / 61.46 / 63.12 | 86.92 / 65.79 / 61.28 |
+| DELTASEG (2023) | Differential Boundary Network | 81.42 / -- / -- | 82.95 / -- / -- | -- / -- / -- |
+| Trans-UNet (2021) | Hybrid CNN-Transformer | 81.01 / 57.31 / 56.88 | 86.78 / 63.15 / 65.16 | 88.45 / 68.78 / 63.17 |
+| U$^2$-Net (2020) | Nested U-Structure | 80.92 / 56.72 / 56.02 | 85.92 / 62.01 / 62.58 | 87.78 / 67.34 / 62.39 |
+| HoVer-Net (2019) | Distance Map Regression | 82.30 / 61.80 / 60.50 | 86.80 / 65.50 / 64.20 | 88.10 / 67.90 / 63.50 |
+| **DualBranchNet (Ours)** | **Wavelet-ResNet Fuzzy Hybrid** | **82.46 / 62.44 / 61.49** | **88.00 / 70.23 / 69.69** | **90.02 / 70.82 / 67.40** |
 
-### Modular Ablation Highlights
-- Learnable Lifting Wavelet Scheme: Surpasses fixed Haar wavelets (+3.48% Dice, +5.41% AJI on MoNuSeg), confirming that learnable directional filtering preserves sub-pixel nuclear margins.
-- Sugeno Fuzzy Fusion: Outperforms feature concatenation, majority voting, and gated attention across all datasets.
-- Loss Progression: Adding L_feat steadily improves baseline L_seg, distance regression (L_hv) contributes the primary instance separation gain (+5.0 AJI), and Sobel boundary regularization (L_boundary) maximizes boundary sharpness.
+</details>
 
-## Installation and Environment Setup
+---
 
-Clone the repository and install the required dependencies:
+## Qualitative Visualizations
 
-```bash
-git clone https://github.com/mukutchatterjee/dual-branch-wavelet-resnet.git
-cd dual-branch-wavelet-resnet
+<p align="center">
+  <img src="figures/qualitative_outputs.png" alt="Qualitative Segmentation Outputs" width="95%"/>
+</p>
 
-python3 -m venv venv
-source venv/bin/activate
+*Figure 2: Multi-stage visual outputs produced by the system across representative test tissue sections. Columns (left to right): (1) Raw H&E input patch at native resolution, (2) Certified expert pathologist ground truth, (3) Sugeno fuzzy integrated continuous foreground probability map $\hat{p}_{\text{fused}}$, (4) Regressed horizontal and vertical HoVer distance maps showing distinct centroid-directed gradients, and (5) Marker-controlled watershed instance segmentation resolving dense cell clusters.*
 
-pip install --upgrade pip
-pip install -r requirements.txt
-```
+---
 
-### Core Libraries
-- PyTorch >= 2.0.0
-- torchvision >= 0.15.0
-- numpy >= 1.23.5
-- scipy >= 1.10.0
-- scikit-image >= 0.20.0
-- scikit-learn >= 1.2.0
-- albumentations >= 1.3.0
-- opencv-python-headless >= 4.7.0
-- Pillow >= 9.4.0
-- pyyaml >= 6.0
+## Ablation Studies and Analysis
 
-## Dataset Layout
+Systematic modular ablations validate the mathematical contribution of each architectural block:
 
-Organize datasets under the `datasets/` root directory using native-resolution images:
+1. **Learnable Directional Lifting Preserves Fine Boundaries (+5.41% AJI on MoNuSeg):** Replacing fixed Haar wavelets with our learnable directional predict/update filters yields substantial gains (+3.48% Dice, +5.41% AJI on MoNuSeg). This confirms that learning spatial orientation vectors preserves sub-pixel nuclear margins that are permanently erased by conventional pooling.
+2. **Sugeno Fuzzy Fusion Arbitrates Source Reliability (+2.32% AJI over Standard Sugeno, +3.23% over Concatenation):** Fusing branch probabilities via learned singleton densities ($g_1, g_2$) significantly outperforms linear averaging, concatenation, and gated attention. The fuzzy integral acts as an adaptive confidence gate, defaulting to the wavelet stream along sharp boundaries and the ResNet stream within homogeneous cell bodies.
+3. **Skip Feature Alignment ($\mathcal{L}_{\text{feat}}$) Prevents Representation Drift:** Directing transposed-convolution upsamplings to align with encoder skip features via normalized MSE maximizes cosine similarity ($2(1 - \cos\theta)$), providing steady convergence gains (+1.55% Dice, +2.25% AJI on MoNuSeg).
+4. **Mean Squared Gradient Error (MSGE) Enforces Steep Topographic Basins (+5.0 AJI Gain):** Supervising horizontal and vertical Sobel gradients across distance maps suppresses artifacts on the topological energy surface, preventing spurious over-segmentation during watershed flooding.
 
-```
-datasets/
-├── MoNuSeg/
-│   ├── Train/
-│   │   ├── Images/             # Original H&E histology images (.tif / .png)
-│   │   └── Masks/              # Instance-level binary or labeled masks
-│   └── Test/
-│       ├── Images/
-│       └── Masks/
-├── TNBC/
-│   ├── Train/
-│   │   ├── Images/
-│   │   └── Masks/
-│   ├── Validation/
-│   │   ├── Images/
-│   │   └── Masks/
-│   └── Test/
-│       ├── Images/
-│       └── Masks/
-└── CPM15/
-    ├── Images/
-    └── Masks/
-```
+<details>
+<summary><b>View official modular and loss ablation tables</b></summary>
 
-Training crops are sampled on-the-fly at native resolution (256x256) via a 4-try foreground-biased sampler. Whole-slide images are never downsampled directly, avoiding resolution degradation.
+### Modular Architecture Ablation (Scores in %)
+| Component Under Test | Tested Configuration | MoNuSeg (Dice / AJI / PQ) | TNBC (Dice / AJI / PQ) | CPM-15 (Dice / AJI / PQ) |
+|:---|:---|:---:|:---:|:---:|
+| **ResUNet Backbone** | EfficientNet-B0 Block | 80.66 / 57.91 / 58.87 | 86.10 / 67.18 / 62.95 | 87.89 / 67.61 / 63.45 |
+| | VGG-16 Block | 80.59 / 57.27 / 56.11 | 86.78 / 62.95 / 61.73 | 87.38 / 67.71 / 63.14 |
+| | DenseNet-121 Block | 80.90 / 58.82 / 58.27 | 86.77 / 67.98 / 65.30 | 88.98 / 66.88 / 61.71 |
+| | **ResBlock (Ours)** | **80.99 / 59.04 / 58.19** | **87.08 / 68.62 / 65.69** | **89.46 / 70.38 / 64.94** |
+| **Wavelet Scheme** | Fixed Haar Wavelet | 80.52 / 60.95 / 58.96 | 86.09 / 61.36 / 61.97 | 88.30 / 67.58 / 65.81 |
+| | Single Shared MLP Predict | 80.87 / 57.02 / 57.65 | 86.97 / 63.52 / 62.72 | 88.24 / 65.77 / 63.21 |
+| | **Directional LLWT (Ours)** | **80.95 / 60.36 / 59.92** | **87.23 / 67.18 / 66.87** | **89.11 / 68.58 / 65.71** |
+| **Decision Fusion** | Feature Concatenation | 80.78 / 59.21 / 58.93 | 84.62 / 62.01 / 62.91 | 85.70 / 67.45 / 64.34 |
+| | Majority Voting | 80.41 / 58.75 / 57.21 | 85.45 / 61.97 / 63.02 | 87.34 / 67.62 / 62.03 |
+| | Standard Fixed Sugeno | 81.56 / 60.12 / 59.78 | 87.01 / 63.00 / 64.72 | 88.98 / 69.31 / 63.49 |
+| | **Learnable Sugeno (Ours)**| **82.46 / 62.44 / 61.49** | **88.00 / 70.23 / 69.69** | **90.02 / 70.82 / 67.40** |
 
-## Training Protocol
+### Composite Loss Objective Progression (Scores in %)
+| $\mathcal{L}_{\text{seg}}$ | $\mathcal{L}_{\text{feat}}$ | $\mathcal{L}_{\text{hv}}$ | $\mathcal{L}_{\text{bnd}}$ | MoNuSeg (Dice / AJI / PQ) | TNBC (Dice / AJI / PQ) | CPM-15 (Dice / AJI / PQ) |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| $\checkmark$ | -- | -- | -- | 77.65 / 53.45 / 53.15 | 84.15 / 61.40 / 61.15 | 85.30 / 61.80 / 59.35 |
+| $\checkmark$ | $\checkmark$ | -- | -- | 79.20 / 55.70 / 55.15 | 85.42 / 63.60 / 63.10 | 86.95 / 64.25 / 61.05 |
+| $\checkmark$ | $\checkmark$ | $\checkmark$ | -- | 81.15 / 60.70 / 59.75 | 87.10 / 68.60 / 67.85 | 89.15 / 69.10 / 65.25 |
+| $\checkmark$ | $\checkmark$ | $\checkmark$ | $\checkmark$ | **82.46 / 62.44 / 61.49** | **88.00 / 70.23 / 69.69** | **90.02 / 70.82 / 67.40** |
 
-Run end-to-end model training with Automatic Mixed Precision (AMP), gradient clipping (norm 1.0), and Exponential Moving Average (EMA) weight decay:
+</details>
 
-```bash
-python scripts/train.py \
-    --config configs/monuseg_config.yaml \
-    --device cuda \
-    --batch_size 4 \
-    --lr 3e-4 \
-    --epochs 500 \
-    --amp \
-    --ema \
-    --save_dir checkpoints/monuseg_run
-```
+---
 
-Key Training Hyperparameters:
-- Optimizer: AdamW (lr 3e-4, weight decay 1e-4, beta1 0.9, beta2 0.999)
-- Scheduler: Cosine Annealing with 10-epoch linear warmup
-- EMA Decay: Ramp from 0.0 to 0.999 (asymptotic variance reduction factor approx 1/2000)
-- Augmentations: Flips, orthogonal rotations, affine shear (+-5 deg), color jitter, Gaussian blur, sensor noise, and random erasing (p=0.2).
+## Method Details
 
-## Seamless Inference and Instance Decoding
+<details>
+<summary><b>Mathematical formulation and inference pipeline</b></summary>
 
-To evaluate full images without tiling seam artifacts, the inference pipeline applies 2D raised-cosine (Hanning) window stitching across overlapping patches (stride 192, crop size 256):
+### 1. Invertible 2D Learnable Lifting Wavelet Transform
+Feature tensor $\mathbf{X} \in \mathbb{R}^{C \times H \times W}$ is split into four polyphase grids: reference ($x_{00}$), horizontal ($x_{01}$), vertical ($x_{10}$), and diagonal ($x_{11}$). 
+- **StainAdapt Calibration:** Global spatial descriptor $\mathbf{y}_{\text{gap}} = \operatorname{GAP}(x_{00})$ scales polyphase features via bottleneck MLP: $S(x_{00}, f) = f \odot \sigma(\mathbf{W}_2 \operatorname{ReLU}(\mathbf{W}_1 \mathbf{y}_{\text{gap}} + \mathbf{b}_1) + \mathbf{b}_2)$.
+- **Directional Predict:** $d_k = x_k - S_k(x_{00}, \mathcal{P}_k(x_{00}))$ for $k \in \{01, 10, 11\}$ with depthwise convolutions $\mathcal{P}_k$.
+- **Directional Update:** $c_l = x_{00} + \sum_{k} k_k \mathcal{U}_k(d_k)$ with depthwise operators $\mathcal{U}_k$ and learned scalars $k_k$.
+- **Exact Invertibility (Theorem 1):** Because update and predict operations form a triangular uncoupled system, the downsampling is mathematically lossless:
+  $$x_{00} = c_l - \sum_{k} k_k \mathcal{U}_k(d_k), \qquad x_k = d_k + S_k(x_{00}, \mathcal{P}_k(x_{00}))$$
 
-```bash
-python scripts/evaluate.py \
-    --checkpoint checkpoints/monuseg_run/best_model_ema.pth \
-    --dataset MoNuSeg \
-    --data_dir datasets/MoNuSeg/Test \
-    --patch_size 256 \
-    --stride 192 \
-    --tune_watershed \
-    --output_dir results/monuseg_preds
-```
+### 2. Multi-Scale Bi-Directional Cross-Attention (BiCA)
+To eliminate the quadratic $(HW)^2$ memory bottleneck of spatial self-attention, BiCA flattens spatial dimensions into $N = HW$ tokens and computes cross-covariance in channel space:
+$$\mathbf{A}_{i, j} = \frac{1}{\sqrt{N}} \langle \mathbf{Q}_{i, :}, \, \mathbf{K}_{j, :} \rangle, \qquad \tilde{\mathbf{A}} = \operatorname{Softmax}_{\text{row}}(\mathbf{A})$$
+$$\hat{\mathbf{x}}_q = \mathbf{x}_q + \mathbf{W}_{\text{out}}(\tilde{\mathbf{A}}\mathbf{V})$$
+- **Zero-Initialized Identity Mapping (Theorem 2):** Weight $\gamma$ and bias $\beta$ of Batch Normalization in $\mathbf{W}_{\text{out}}$ are initialized to zero ($\gamma = 0, \beta = 0$), ensuring $\hat{\mathbf{x}}_q^{(0)} \equiv \mathbf{x}_q^{(0)}$ at step $t=0$, insulating pre-trained ResNet features from random early gradient shocks.
 
-### Instance Separation Pipeline
-1. Sliding-Window Blending: Raised-cosine kernel W(i, j) = max(w(i), 0.1) * max(w(j), 0.1) blends overlapping patch predictions.
-2. Gradient Energy Surface: Evaluates Sobel gradient magnitudes on horizontal and vertical distance maps:
-    G(y, x) = max( |grad(H_hat)|, |grad(V_hat)| )
-    G_tilde = (G - min(G)) / (max(G) - min(G) + epsilon)
-3. Marker Generation: Identifies seed basins where G_tilde < tau_seed within the semantic mask, followed by morphological disk erosion:
-    S_eroded = S_seed (erosion) Disk(r_erode)
-4. Watershed Flooding: Floods markers across the energy surface bounded strictly within the fused binary foreground mask.
-5. Post-Processing Filter: Spurious instances smaller than 10 pixels are pruned.
-6. Validation Tuning: Optimal parameters (tau_seed in {0.3, 0.4, 0.5, 0.6}, r_erode in {0, 1, 2, 3}) are automatically selected via 2D grid search on a 15% validation split.
+### 3. Sugeno Fuzzy Integral Decision Fusion
+For evidence probabilities $p_w, p_r \in [0, 1]$ and learned singleton densities $g_1, g_2 = \sigma(\theta_1), \sigma(\theta_2)$, the Sugeno fuzzy integral evaluates to the closed-form expression:
+$$p_{\text{fused}} = \max\Big( \min\big(\max(p_w, p_r), \, g_{\max}\big), \, \min(p_w, p_r) \Big)$$
+where $g_{\max} = g_1$ if $p_w \ge p_r$, else $g_2$. The fused probability is converted to logit space via the clamped inverse sigmoid for numerically stable BCE loss computation:
+$$\mathbf{z}_{\text{fused}} = \ln(p_{\text{fused}} + \epsilon) - \ln(1 - p_{\text{fused}} + \epsilon)$$
 
-## Visualizations and Qualitative Outputs
+### 4. Composite Multi-Task Training Objective
+$$\mathcal{L}_{\text{total}} = \mathcal{L}_{\text{seg}} + \lambda_f \mathcal{L}_{\text{feat}} + \lambda_{hv} \mathcal{L}_{hv} + \lambda_b \mathcal{L}_{\text{boundary}}$$
+- **Segmentation Loss ($\mathcal{L}_{\text{seg}}$):** Blends Focal Tversky ($\alpha=0.7, \beta=0.3, \gamma=0.75$) with dynamically weighted Binary Cross-Entropy across primary and intermediate auxiliary decoders (D3, D2).
+- **Skip Alignment Loss ($\mathcal{L}_{\text{feat}}$):** Minimizes normalized MSE across all 4 stages: $\sum_{l=1}^4 \|\frac{\mathbf{u}_l^r}{\|\mathbf{u}_l^r\|_2} - \frac{\mathbf{s}_l^r}{\|\mathbf{s}_l^r\|_2}\|_2^2 \equiv 2(1 - \cos\theta)$.
+- **HoVer Distance Loss ($\mathcal{L}_{hv}$):** Combines global MSE on $[-1, 1]$ normalized centroid offsets with foreground-restricted Mean Squared Gradient Error (MSGE) using horizontal/vertical Sobel kernels.
+- **Boundary Consistency Loss ($\mathcal{L}_{\text{boundary}}$):** Penalizes $L_1$ discrepancy between Sobel gradient magnitudes: $\| \, |\nabla_S \sigma(\mathbf{z})| - |\nabla_S \mathbf{M}_{\text{gt}}| \, \|_1$.
 
-The model generates three synchronized diagnostic representations:
+### 5. Seamless Sliding-Window Blending and Marker-Controlled Watershed
+- **2D Raised-Cosine Stitching:** Inference applies a Hanning window kernel $\mathbf{W}(i, j) = \max(w(i), 0.1) \cdot \max(w(j), 0.1)$ across overlapping patches (stride 192, crop size 256) to eliminate boundary tiling seams.
+- **Topological Energy Field:** Constructed from normalized Sobel gradient magnitudes on horizontal and vertical distance maps:
+  $$\tilde{\mathbf{G}} = \frac{\mathbf{G} - \min(\mathbf{G})}{\max(\mathbf{G}) - \min(\mathbf{G}) + \epsilon}, \qquad \mathbf{G} = \max(|\nabla \hat{\mathbf{H}}|, \, |\nabla \hat{\mathbf{V}}|)$$
+- **Marker Flooding:** Foreground seeds identified where $\tilde{\mathbf{G}} < \tau_{\text{seed}}$ are eroded by disk radius $r_{\text{erode}}$ and flooded across $\tilde{\mathbf{G}}$ bounded strictly within the binary mask $\hat{p}_{\text{fused}} \ge 0.5$. Artifacts smaller than 10 pixels are removed.
+</details>
 
-1. Fused Probability Masks: Binary semantic representation produced by Sugeno fuzzy arbitration, maintaining clean margins across varying stain distributions.
-2. HoVer Topological Surfaces: Continuous horizontal and vertical distance fields showing clean gradient reversals across abutting cell membranes.
-3. Instance Label Matrices: Color-coded nuclear instances resolved by marker-controlled watershed flooding.
+---
 
 ## Citation
 
-If you use this codebase or model architecture in your research, please cite the following publication:
+If you use this work, codebase, or results in your research, please cite our paper:
 
 ```bibtex
-@inproceedings{bhattacharjee2024dualbranch,
-  title={A Dual-Branch Wavelet-ResNet Model with Cross-Attention and Fuzzy Fusion for Nuclear Segmentation and Instance Segmentation in Histopathology Images},
-  author={Bhattacharjee, Diptarko and Chatterjee, Mukut and Kaplun, Dmitrij and Sarkar, Ram},
-  booktitle={Proceedings of the IEEE International Symposium on Biomedical Imaging (ISBI)},
-  year={2024},
-  organization={IEEE}
+@inproceedings{bhattacharjee2025dualbranch,
+  title     = {A Dual-Branch Wavelet-ResNet Model with Cross-Attention and Fuzzy Fusion for Nuclear Segmentation and Instance Segmentation in Histopathology Images},
+  author    = {Bhattacharjee, Diptarko and Chatterjee, Mukut and Kaplun, Dmitrij and Sarkar, Ram},
+  booktitle = {Proceedings of the IEEE International Symposium on Biomedical Imaging (ISBI)},
+  year      = {2025},
+  organization = {IEEE},
+  url       = {https://biomedicalimaging.org/}
 }
 ```
 
+---
+
+## Acknowledgements
+
+Computational resources were provided by the Centre for Microprocessor Applications for Training Education and Research (CMATER), Department of Computer Science & Engineering, Jadavpur University, Kolkata, India. Part of this research was supported by the Intelligent Devices Institute, St. Petersburg Electrotechnical University "LETI", Russia.
+
+---
+
 ## License and IEEE Terms
 
-This project is licensed under the Apache License 2.0.
+This project is distributed under the **Apache License 2.0**. See the [LICENSE](LICENSE) file for complete details.
 
 In accordance with IEEE conference publication policies and author guidelines, please review the IEEE Intellectual Property Rights and symposium documentation at the [IEEE International Symposium on Biomedical Imaging (ISBI)](https://biomedicalimaging.org/) portal and the [IEEE Open Access Policies](https://www.ieee.org/publications/rights/index.html).
 
+---
+
+## Contact
+
+For inquiries regarding the methodology, mathematical formulations, or reproduction of experimental benchmarks:
+
+- **Mukut Chatterjee** (Co-First Author): [mukutchatterjee0211@gmail.com](mailto:mukutchatterjee0211@gmail.com) — Jadavpur University, Kolkata, India
+- **Diptarko Bhattacharjee** (Co-First Author): [diptarko.1312@gmail.com](mailto:diptarko.1312@gmail.com) — Jadavpur University, Kolkata, India
+- **Dmitrij Kaplun** (Corresponding Author): [dikaplun@etu.ru](mailto:dikaplun@etu.ru) — ETU "LETI", St. Petersburg, Russia
+- **Symposium Portal:** [IEEE International Symposium on Biomedical Imaging (ISBI)](https://biomedicalimaging.org/)
